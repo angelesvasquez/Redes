@@ -15,7 +15,8 @@
     int Res;
     int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     int n;
- 
+    char buffer[256];
+
     if (-1 == SocketFD)
     {
       perror("cannot create socket");
@@ -26,7 +27,7 @@
  
     stSockAddr.sin_family = AF_INET;
     stSockAddr.sin_port = htons(45000); //45000
-    Res = inet_pton(AF_INET, "127.0.0.1", &stSockAddr.sin_addr);
+    Res = inet_pton(AF_INET, "172.16.18.136", &stSockAddr.sin_addr);
  
     if (0 > Res)
     {
@@ -47,9 +48,10 @@
       close(SocketFD);
       exit(EXIT_FAILURE);
     }
-    n = write(SocketFD,"Hi, this is Julio.",18);
+    n = write(SocketFD,"Angeles",18);
     /* perform read write operations ... */
- 
+    n = read(SocketFD, buffer, 255);
+    printf("Here is the message: [%s]\n",buffer);
     shutdown(SocketFD, SHUT_RDWR);
  
     close(SocketFD);
