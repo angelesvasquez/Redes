@@ -1,4 +1,4 @@
-  /* Server code in C */
+  //*Server
  
   #include <sys/types.h>
   #include <sys/socket.h>
@@ -9,13 +9,17 @@
   #include <string.h>
   #include <unistd.h>
  
-  int main(void)
+  int main(int argc, char* argv[])
   {
     struct sockaddr_in stSockAddr;
     int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     char buffer[256];
     int n;
  
+    if(argc != 2) {
+      printf("%s <puerto>\n", argv[0]);
+      exit(EXIT_FAILURE);
+    }
     if(-1 == SocketFD)
     {
       perror("can not create socket");
@@ -25,7 +29,7 @@
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
  
     stSockAddr.sin_family = AF_INET;
-    stSockAddr.sin_port = htons(45000);
+    stSockAddr.sin_port = htons(atoi(argv[1]));
     stSockAddr.sin_addr.s_addr = INADDR_ANY;
  
     if(-1 == bind(SocketFD,(const struct sockaddr *)&stSockAddr, sizeof(struct sockaddr_in))) // El servidor usa el puerto
@@ -66,13 +70,15 @@
          }
          else{
             buffer[n]='\0'; // revisar
-            printf("Cliente: %s\n",buffer);
+            printf("Client: %s\n",buffer);
         }
-         if(strcmp(buffer, "salir") == 0) break;
-         printf("Respuesta: ");
-         fgets(buffer, sizeof(buffer),stdin);
-         n = write(ConnectFD,buffer, strlen(buffer)); // Envia
-         if (n < 0) perror("ERROR writing to socket");
+        if(strcmp(buffer, "END") == 0) break;
+        printf("Response: ");
+        fgets(buffer, sizeof(buffer),stdin);
+        buffer[strcspn(buffer, "\n")] = '\0';
+        n = write(ConnectFD,buffer, strlen(buffer)); // Envia
+        if (n < 0) perror("ERROR writing to socket");
+        if(strcmp(buffer, "END") == 0) break;
          
          /* perform read write operations ... */
          

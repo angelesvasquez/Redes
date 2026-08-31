@@ -1,11 +1,4 @@
- /* Tarea 1
-    Chat de mensajes con cliente-servidor
-    Cliente se conecta al sevidor
-    Escribe un mensaje
-    El servidor recibe el mensaje, puede escribir una respuesta
-    Cliente recibe la respuesta y asi se repite.
-
- */
+ // Client
  
   #include <sys/types.h>
   #include <sys/socket.h>
@@ -16,14 +9,18 @@
   #include <string.h>
   #include <unistd.h>
  
-  int main(void)
+  int main(int argc, char* argv[])
   {
     struct sockaddr_in stSockAddr;
     int Res;
-    int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); // Crea la conexion
+    int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     int n;
     char buffer[256];
-    //char message[256];
+
+    if(argc != 3) {
+      printf("%s <ip> <puerto>\n", argv[0]);
+      exit(EXIT_FAILURE);
+    }
 
     if (-1 == SocketFD)
     {
@@ -34,8 +31,8 @@
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
  
     stSockAddr.sin_family = AF_INET;
-    stSockAddr.sin_port = htons(45000); //45000
-    Res = inet_pton(AF_INET, "127.0.0.1", &stSockAddr.sin_addr);
+    stSockAddr.sin_port = htons(atoi(argv[2])); //45000
+    Res = inet_pton(AF_INET, argv[1], &stSockAddr.sin_addr);
  
     if (0 > Res)
     {
@@ -50,7 +47,7 @@
       exit(EXIT_FAILURE);
     }
  
-    if (-1 == connect(SocketFD, (const struct sockaddr *)&stSockAddr, sizeof(struct sockaddr_in))) // El cliente se conecta
+    if (-1 == connect(SocketFD, (const struct sockaddr *)&stSockAddr, sizeof(struct sockaddr_in)))
     {
       perror("connect failed");
       close(SocketFD);
@@ -58,14 +55,13 @@
     }
     while(1){
 
-        printf("Escribe tu mensaje: ");
+        printf("Write your message: ");
         fgets(buffer, sizeof(buffer), stdin);
-        buffer[strcspn(buffer, "\n")] = '\0'; // revisar
+        buffer[strcspn(buffer, "\n")] = '\0';
         n = write(SocketFD,buffer,strlen(buffer));
         if (n < 0) perror("ERROR writing from socket");
-        // hasta aqui 
-        /* perform read write operations ... */
         if(strcmp(buffer, "END") == 0) break;
+
         n = read(SocketFD, buffer, 255);
         if (n < 0) perror("ERROR reading from socket");
         else if(n==0){
@@ -74,10 +70,9 @@
         }
         else {
             buffer[n]='\0';
-            printf("Servidor: %s", buffer);
+            if(strcmp(buffer, "END") == 0) break;
+            printf("Server: %s\n", buffer);
         }
-            //printf("Here is the message: [%s]\n",buffer);
-
 
     }
     
