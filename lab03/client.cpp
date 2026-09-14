@@ -1,16 +1,17 @@
- // Client
- 
-  #include <sys/types.h>
-  #include <sys/socket.h>
-  #include <netinet/in.h>
-  #include <arpa/inet.h>
-  #include <stdio.h>
-  #include <stdlib.h>
-  #include <string.h>
-  #include <unistd.h>
- 
-  int main(int argc, char* argv[])
-  {
+// Client
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+
+int main(int argc, char* argv[])
+{
     struct sockaddr_in stSockAddr;
     int Res;
     int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -31,7 +32,7 @@
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
  
     stSockAddr.sin_family = AF_INET;
-    stSockAddr.sin_port = htons(atoi(argv[2])); //45000
+    stSockAddr.sin_port = htons(atoi(argv[2]));
     Res = inet_pton(AF_INET, argv[1], &stSockAddr.sin_addr);
  
     if (0 > Res)
@@ -79,4 +80,4 @@
     shutdown(SocketFD, SHUT_RDWR);
     close(SocketFD);
     return 0;
-  }
+}
