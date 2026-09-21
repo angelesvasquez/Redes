@@ -1,0 +1,97 @@
+        if (buff[0] == 'm' || buff[0] == 'b' || buff[0] == 'l') {
+            char messageType = buff[0];
+            string sender = "";
+
+            // Si es 'm' o 'b', leemos el remitente (el nick)
+            if (messageType == 'm' || messageType == 'b') {
+                n = read(SocketFD, buff, 7);
+                buff[n] = '\0';
+                int senderSize = atoi(buff);
+
+                n = read(SocketFD, buff, senderSize);
+                buff[n] = '\0';
+                sender = buff;
+            }
+
+            // Leer el tamaño del contenido (mensaje o lista)
+            n = read(SocketFD, buff, 11);
+            buff[n] = '\0';
+            msgSize = atoi(buff);
+
+            // Leer el contenido real
+            n = read(SocketFD, buff, msgSize);
+            buff[n] = '\0';
+            string content = buff;
+
+            // Mostrar según corresponda
+            if (messageType == 'm') {
+                cout << "\n[Private from " << sender << "]: " << content << "\n> " << flush;
+            } else if (messageType == 'b') {
+                cout << "\n[Broadcast from " << sender << "]: " << content << "\n> " << flush;
+            } else if (messageType == 'l') {
+                cout << "\n[Connected clients]: " << content << "\n> " << flush;
+            }
+        }
+
+
+// thread read server 
+        if (buff[0] == 'm' || buff[0] == 'b' || buff[0] == 'l') {
+            char messageType = buff[0];
+            string sender = "";
+
+            // Si es 'm' o 'b', leemos el remitente (el nick)
+            if (messageType == 'm' || messageType == 'b') {
+                n = read(SocketFD, buff, 7);
+                buff[n] = '\0';
+                int senderSize = atoi(buff);
+
+                n = read(SocketFD, buff, senderSize);
+                buff[n] = '\0';
+                sender = buff;
+            }
+
+            // Leer el tamaño del contenido (mensaje o lista)
+            n = read(SocketFD, buff, 11);
+            buff[n] = '\0';
+            msgSize = atoi(buff);
+
+            // Leer el contenido real
+            n = read(SocketFD, buff, msgSize);
+            buff[n] = '\0';
+            string content = buff;
+
+            // Mostrar según corresponda
+            if (messageType == 'm') {
+                cout << "\n[Private from " << sender << "]: " << content << "\n> " << flush;
+            } else if (messageType == 'b') {
+                cout << "\n[Broadcast from " << sender << "]: " << content << "\n> " << flush;
+            } else if (messageType == 'l') {
+                cout << "\n[Connected clients]: " << content << "\n> " << flush;
+            }
+        }
+
+// menu
+    cout << "\nAvailable commands:\n [M] Private Message\n [B] Broadcast\n [L] List Clients\n [Q] Quit\n";
+
+    while (true) {
+        cout << "> ";
+        getline(cin, option);
+
+        if (option == "Q" || option == "q") {
+            write(SocketFD, "Q", 1);
+            break;
+        } 
+        else if (option == "B" || option == "b") {
+            // ... (código existente de B)
+        } 
+        else if (option == "M" || option == "m") {
+            // ... (código existente de M)
+        } 
+        else if (option == "L" || option == "l") {
+            // Pedir la lista al servidor mandando solo la letra 'L'
+            write(SocketFD, "L", 1);
+        } 
+        else {
+            cout << "Unrecognized command.\n";
+        }
+    }
