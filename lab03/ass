@@ -1,36 +1,20 @@
-        if (buff[0] == 'm' || buff[0] == 'b' || buff[0] == 'l') {
-            char messageType = buff[0];
-            string sender = "";
-
-            // Si es 'm' o 'b', leemos el remitente (el nick)
-            if (messageType == 'm' || messageType == 'b') {
-                n = read(SocketFD, buff, 7);
-                buff[n] = '\0';
-                int senderSize = atoi(buff);
-
-                n = read(SocketFD, buff, senderSize);
-                buff[n] = '\0';
-                sender = buff;
+        
+                } else if (buff[0] == 'L') {
+            // Unir los nicks del mapa en un solo texto separado por comas
+            string clientList = "";
+            for (auto const& pair : ListOfCli) {
+                if (!clientList.empty()) clientList += ", ";
+                clientList += pair.first;
             }
 
-            // Leer el tamaño del contenido (mensaje o lista)
-            n = read(SocketFD, buff, 11);
-            buff[n] = '\0';
-            msgSize = atoi(buff);
+            // Armar la respuesta: 'l' + tamaño (11 bytes) + lista de clientes
+            dataStructure = "";
+            dataStructure += 'l';
+            dataStructure += zeroPad(clientList.size(), 11);
+            dataStructure += clientList;
 
-            // Leer el contenido real
-            n = read(SocketFD, buff, msgSize);
-            buff[n] = '\0';
-            string content = buff;
-
-            // Mostrar según corresponda
-            if (messageType == 'm') {
-                cout << "\n[Private from " << sender << "]: " << content << "\n> " << flush;
-            } else if (messageType == 'b') {
-                cout << "\n[Broadcast from " << sender << "]: " << content << "\n> " << flush;
-            } else if (messageType == 'l') {
-                cout << "\n[Connected clients]: " << content << "\n> " << flush;
-            }
+            // Enviar la lista de vuelta al cliente
+            write(clientSocket, dataStructure.c_str(), dataStructure.size());
         }
 
 
