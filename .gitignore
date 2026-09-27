@@ -1,4 +1,3 @@
 *.exe
-tests
-cli
-ser
+/tests
+/bin
