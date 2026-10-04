@@ -1,43 +1,51 @@
 // Example program
 #include <iostream>
 #include <string>
+#include <algorithm>
+#include <vector>
 
 using namespace std;
 
-struct Board{
+
+class Game{   
+    public:
+    bool active = 0;
+    string p1N;
+    string p2N;
+    int p1,p2;
+    vector<int> spectators;
+    
     char board[9] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
     char current;
-    bool winner;
+    char winner;
     
-    char& operator[](int pos){return board[pos];}
-    const char& operator[](int pos) const {return board[pos];}
+    Game(string ps1, string ps2, int id1, int id2){
+        p1N = ps1;
+        p2N = ps2;
+        p1 = id1; p2 = id2;
+        active = 1;
+        current = 'X';
+        winner = ' ';
+    }
 
-    bool setMove(char s, int pos){
+    bool setMove(int pos){
         if(pos >8 || pos < 0){
-            cout<<"Fuera del rango"<<endl;
+            //cout<<"Fuera del rango"<<endl;
             return 0;
         }
         if(board[pos] != ' '){
-            cout<<"Casilla ocupada"<<endl;
+            //cout<<"Casilla ocupada"<<endl;
             return 0;
-        } else {
-            board[pos] = s;
-            return 1;
-        }
+        } 
+        board[pos] = current;
+        
+        // if(checkWin(current)){
+        //     winner = current;
+        //     active = 0;
+        //     return 1;
+        // }
+        return 1;
     }
-public:
-    Board(){
-        current = 'X';
-        winner = 0;
-    }
-    
-};
-
-
-class Game{
-    Board b;
-    string player1;
-    string player2;
     
     bool checkWin(char p){
         int wins[8][3] = {
@@ -46,21 +54,32 @@ class Game{
             {0,4,8}, {2,4,6}
         };
         for (auto& w : wins) {
-            if (b[w[0]] == p && b[w[1]] == p && b[w[2]] == p) return true;
+            if (board[w[0]] == p && board[w[1]] == p && board[w[2]] == p) return true;
         }
         return false;
     }
-    
-public:
-    Game(string p1, string p2){
-        player1 = p1;
-        player2 = p2;
+
+    // int getP1(){
+    //     return p1;
+    // }
+    // int getP2(){
+    //     return p2;
+    // }
+    void addSpectator(int idSocket){
+        spectators.push_back(idSocket);
     }
+    void removeSpectator(int idSocket){
+        spectators.erase(remove(spectators.begin(),spectators.end(),idSocket),spectators.end());
+    }
+    // vector<int>& getSpectators(){
+    //     return spectators;
+    // }
+
     void printBoard(){
-        cout << " " << b[0] << " | " << b[1] << " | " << b[2] << "   (0, 1, 2)\n";
+        cout << " " << board[0] << " | " << board[1] << " | " << board[2] << "   (0, 1, 2)\n";
         cout << "-----------\n";
-        cout << " " << b[3] << " | " << b[4] << " | " << b[5] << "   (3, 4, 5)\n";
+        cout << " " << board[3] << " | " << board[4] << " | " << board[5] << "   (3, 4, 5)\n";
         cout << "-----------\n";
-        cout << " " << b[6] << " | " << b[7] << " | " << b[8] << "   (6, 7, 8)\n\n";
+        cout << " " << board[6] << " | " << board[7] << " | " << board[8] << "   (6, 7, 8)\n\n";
     }
 };

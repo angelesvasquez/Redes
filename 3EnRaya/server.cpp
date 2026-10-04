@@ -1,21 +1,15 @@
-// Servidor TCP
-// Crea un socket TCP, espera conexiones en el puerto 1100,
-// recibe un mensaje del cliente, lo imprime y responde luego cierra la conexion
-// y vuelve a esperar otro cliente.
-
+// Server
 #include <iostream>
 #include "Game.h"
 #include <cstring>
 #include <sys/types.h>
-// para trabajar con sockets
-// socket(), connect(), shutdown()
 #include <sys/socket.h> 
-#include <netinet/in.h> // Estructura sockaddr_in
-#include <arpa/inet.h> // conversion de IPs, inet_pton()
-#include <stdio.h> // input output como perror()
-#include <stdlib.h> // exit()
-#include <string> // memset()
-#include <unistd.h> // write(), close()
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <unistd.h>
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -25,9 +19,10 @@ using namespace std;
 
 map<string,int> ListOfCli;
 mutex map_mutex;
-vector<Game> games;
+Game* game = 0;
+int clientWaiting = -1;
+string clientWaitingNick = "";
 
-// 5 -> 0005
 string zeroPad(int number, int size){
     string str = to_string(number);
     if(str.length() >= (size_t)size) return str;
@@ -112,9 +107,7 @@ void ThreadReadClient(int IdSocket){
 
 
             lock_guard<mutex> lock(map_mutex);
-            // for(map<string,int>::iterator it = ListOfCli.begin(); it != ListOfCli.end(); it++){
-            //     if(it->second != IdSocket) write(it->second,data.c_str(),data.size());
-            // }
+
             for(auto& p: ListOfCli){
                 if(p.second != IdSocket){
                     write(p.second, data.c_str(), data.size());
@@ -153,7 +146,7 @@ void ThreadReadClient(int IdSocket){
 
             n = read(IdSocket,buffer,25);
             buffer[n] = '\0';
-            file = atoll(buffer); // cadena -> long long int
+            fsize = atoll(buffer);
 
             remaining = fsize;
             while(remaining > 0){
@@ -162,7 +155,7 @@ void ThreadReadClient(int IdSocket){
                 file.append(buffer, n);
                 remaining -= n;
             }
-            if(remaining > 0){   // el cliente se cayó a mitad del archivo
+            if(remaining > 0){
                 lock_guard<mutex> lock(map_mutex);
                 ListOfCli.erase(nickname);
                 close(IdSocket);
@@ -172,14 +165,104 @@ void ThreadReadClient(int IdSocket){
             lock_guard<mutex> lock(map_mutex);
             if(ListOfCli.find(destination) != ListOfCli.end()){
                 data = "f" + zeroPad(nickname.size(),13) + nickname
-                    + zeroPad(fileName.size(),13) + fileName
-                    + zeroPad(file.size(),25) + file;
+                        + zeroPad(fileName.size(),13) + fileName
+                        + zeroPad(file.size(),25) + file;
                 write(ListOfCli[destination], data.c_str(), data.size());
             }
             else{
                 msg = "User not found";
                 data = "e" + zeroPad(msg.size(),11) + msg;
                 write(IdSocket, data.c_str(), data.size());
+            }
+        }
+        else if(action == 'T'){
+            n = read(IdSocket,buffer,1);
+            buffer[n] = '\0';
+            char s = buffer[0];
+
+            if(s == 'P') { // Play
+                if(clientWaiting == -1) {
+                    clientWaiting = IdSocket; 
+                    clientWaitingNick = nickname;
+                
+                }
+                else{
+
+                    game = new Game(clientWaitingNick,nickname,clientWaiting,IdSocket);
+                    data = "TtX";  
+                    write(game->p1,data.c_str(),data.size());
+                    data = "TtO";
+                    write(game->p2,data.c_str(),data.size());
+
+                    data = "TT";
+                    data.append(game->board,9);
+                    write(game->p1,data.c_str(),data.size());
+                    write(game->p2,data.c_str(),data.size());
+
+                    clientWaiting = -1;
+                    clientWaitingNick = "";
+
+
+                    
+                }
+            } else if(s == 'M'){
+                n = read(IdSocket,buffer,1);
+                buffer[n] = '\0';
+                int pos = (buffer[0] - '0') - 1;
+
+                if(game == 0 || !game->active || (IdSocket != game->p1 && IdSocket != game->p2)){
+                    msg = "No estas en una partida";
+                    data = "e" + zeroPad(msg.size(),11) + msg;
+                    write(IdSocket,data.c_str(),data.size());
+                } else{
+                    char symbol;
+                    if(IdSocket == game->p1) symbol = 'X';
+                    if(IdSocket == game->p2) symbol = 'O';
+
+                    if(symbol != game->current){
+                        msg = "No es tu turno";
+                        data = "e" + zeroPad(msg.size(),11) + msg;
+                        write(IdSocket, data.c_str(), data.size());
+                    }
+                    else if(!game->setMove(pos)){
+                        msg = "Movimiento Invalido";
+                        data = "e" + zeroPad(msg.size(),11) + msg;
+                        write(IdSocket,data.c_str(),data.size());
+                    }
+                    else{
+                        data = "TT";
+                        data.append(game->board, 9);
+                        write(game->p1, data.c_str(), data.size());
+                        write(game->p2, data.c_str(), data.size());
+                        for(int s : game->spectators) write(s, data.c_str(), data.size());
+
+                        if(game->checkWin(symbol)){
+                            int loserId = (IdSocket == game->p1) ? game->p2 : game->p1;
+                            write(IdSocket,"TW",2);
+                            write(loserId,"TO",2);
+                            // game active = false
+                        
+                        } else{
+                            game->current = (game->current == 'X') ? 'O': 'X';
+                            int nextTurn = (game->current == 'X') ? game->p1 : game->p2;
+                            data = "Tt"; 
+                            data += game->current;
+                            write(nextTurn,data.c_str(),data.size());
+                        }
+                    }
+                }
+
+            } else if(s == 'V'){
+                if(game != 0){
+                    game->addSpectator(IdSocket);
+                    data = "TT";
+                    data.append(game->board,9);
+                    write(IdSocket,data.c_str(),data.size());
+                } else{
+                    msg = "No hay partida activa";
+                    data = "e" + zeroPad(msg.size(),11) + msg;
+                    write(IdSocket,data.c_str(),data.size());
+                }
             }
         }
         else if(action == 'Q'){
@@ -201,8 +284,8 @@ int main(int argc, char* argv[]){
 
     struct sockaddr_in stSockAddr;
     int SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    int n; // nro de bytes leidos (read()) o enviados
-    char buffer[256]; // almacena el mensaje recibido del cliente
+    int n;
+    char buffer[256];
 
     if(SocketFD == -1){
         perror("can not create socket");
@@ -215,14 +298,13 @@ int main(int argc, char* argv[]){
     stSockAddr.sin_port = htons(atoi(argv[1]));
     stSockAddr.sin_addr.s_addr = INADDR_ANY;
 
-    // Asigna una direccion IP y un nro de puerto a un socket
     if(-1 == bind(SocketFD, (const struct sockaddr*)&stSockAddr, sizeof(sockaddr_in))){
         perror("error bind failed");
         close(SocketFD);
         exit(EXIT_FAILURE);
     }
 
-    if(-1 == listen(SocketFD,10)) { // nro max en cola (clientes en fila)
+    if(-1 == listen(SocketFD,10)) {
         perror("error listen failed");
         close(SocketFD);
         exit(EXIT_FAILURE);
@@ -231,15 +313,11 @@ int main(int argc, char* argv[]){
     for(;;){
 
         int ClientSocket = accept(SocketFD, NULL, NULL);
-        // accept espera hasta que llegue un cliente
-        // ponemos NULL si NO nos interesa saber quien se conecto
-        // Se crea un socket unicamente para el cliente
 
         if(0 > ClientSocket){
             perror("error accept failed");
             continue;
         }
-
         
         thread(ThreadReadClient,ClientSocket).detach();
 

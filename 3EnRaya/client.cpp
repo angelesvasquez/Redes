@@ -1,18 +1,12 @@
-// Red TCP/IP
-// Se conecta a un servidor a traves de una IP y un puerto
-// Enviamos un mensaje de texto y luego cierra la conexion 
-
+// Client
 #include <iostream>
 #include <cstring>
 #include <fstream>
 #include <sstream>
-// para trabajar con sockets
-// socket(), connect(), shutdown()
 #include <sys/socket.h> 
-#include <netinet/in.h> // Estructura sockaddr_in
-#include <arpa/inet.h> // conversion de IPs, inet_pton()
-
-#include <unistd.h> // write(), close()
+#include <netinet/in.h>
+#include <arpa/inet.h> 
+#include <unistd.h>
 
 #include <thread>
 
@@ -70,7 +64,7 @@ void ThreadReadServer(int IdSocket){
             buffer[n] = '\0';
             size = atoi(buffer);
 
-            read(IdSocket,buffer,size);
+            n = read(IdSocket,buffer,size);
             buffer[n] = '\0';
             cout<<"Error: "<<buffer<<endl;
         }
@@ -110,6 +104,29 @@ void ThreadReadServer(int IdSocket){
             ofstream out("recv_" + fileName, ios::binary);
             out.write(file.data(), file.size());
             cout<<"File '"<<fileName<<"' received from "<<origin<<" ("<<file.size()<<" bytes)"<<endl;
+        }
+        else if(action == 'T'){
+            n = read(IdSocket,buffer,1);
+            char s = buffer[0];
+
+            if(s == 't'){
+                n = read(IdSocket,buffer,1);
+                buffer[n] = '\0';
+                cout<<"Tu simbolo: "<<buffer[0]<<endl;
+            } else if(s == 'T'){
+                n = read(IdSocket,buffer,9);
+                buffer[n] = '\0';
+                cout << " " << buffer[0] << " | " << buffer[1] << " | " << buffer[2] << "   (0, 1, 2)\n";
+                cout << "-----------\n";
+                cout << " " << buffer[3] << " | " << buffer[4] << " | " << buffer[5] << "   (3, 4, 5)\n";
+                cout << "-----------\n";
+                cout << " " << buffer[6] << " | " << buffer[7] << " | " << buffer[8] << "   (6, 7, 8)\n\n";
+
+            } else if(s=='W'){
+                cout<<"Ganaste la partida!!"<<endl;
+            } else if(s=='O'){
+                cout<<"Perdiste la partida.."<<endl;
+            }
         }
     }
 }
@@ -169,7 +186,7 @@ int main(int argc, char *argv[]){
 
     thread(ThreadReadServer,SocketFD).detach();
     
-    cout<<"[B]: Broadcast, [M]: Private Message, [F]: File, [Q]: Quit, [L] List of Clients\n";
+    cout<<"[B]: Broadcast, [M]: Private Message, [F]: File, [Q]: Quit, [L] List of Clients,[T] Tic-Tac-Toe\n";
     string option;
     for(;;){
         cout<<"> ";
@@ -220,6 +237,26 @@ int main(int argc, char *argv[]){
                 + zeroPad(fileName.size(),13) + fileName
                 + zeroPad(file.size(),25) + file;
             write(SocketFD, data.c_str(), data.size());
+        }
+        else if(option == "T" || option == "t"){
+            cout << "\n[1] Jugar  [2] Observar  [3] Mover\n> ";
+            string op;
+            getline(cin, op);
+            
+            if(op == "1"){
+                write(SocketFD,"TP",2);
+            }
+            else if(op == "2"){
+                write(SocketFD,"TV",2);
+            }
+            else if(op == "3"){
+                cout<<"Posicion (1-9): ";
+                string pos;
+                getline(cin, pos);
+                data = "TM" + pos.substr(0,1);
+                write(SocketFD,data.c_str(),data.size());
+            }
+            else cout<<"Invalid option"<<endl;
         }
         else cout<<"Invalid option"<<endl;
         
