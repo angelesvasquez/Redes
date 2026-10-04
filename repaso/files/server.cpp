@@ -151,7 +151,7 @@ void ThreadReadClient(int IdSocket){
 
             n = read(IdSocket,buffer,25);
             buffer[n] = '\0';
-            file = atoll(buffer); // cadena -> long long int
+            fsize = atoll(buffer); // cadena -> long long int
 
             remaining = fsize;
             while(remaining > 0){
