@@ -66,6 +66,7 @@ class Game{
     //     return p2;
     // }
     void addSpectator(int idSocket){
+        for(int s : spectators) if(s == idSocket) return;
         spectators.push_back(idSocket);
     }
     void removeSpectator(int idSocket){

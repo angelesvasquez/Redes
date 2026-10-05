@@ -12,6 +12,8 @@
 
 using namespace std;
 
+bool observador = 0;
+
 string zeroPad(int number, int size){
     string str = to_string(number);
     if(str.length() >= (size_t)size) return str;
@@ -19,6 +21,7 @@ string zeroPad(int number, int size){
 }
 
 void ThreadReadServer(int IdSocket){
+    char MySymbol = ' ';
     char buffer[1000];
     int n, size;
     long long fsize, remaining;
@@ -66,7 +69,10 @@ void ThreadReadServer(int IdSocket){
 
             n = read(IdSocket,buffer,size);
             buffer[n] = '\0';
+            string err = buffer;
+            if(err == "No hay partida activa" || err == "Ya eres jugador") observador = false;
             cout<<"Error: "<<buffer<<endl;
+            cout<<"> "<<flush;
         }
         else if(action == 'f'){
             string fileName, file;
@@ -112,20 +118,38 @@ void ThreadReadServer(int IdSocket){
             if(s == 't'){
                 n = read(IdSocket,buffer,1);
                 buffer[n] = '\0';
-                cout<<"Tu simbolo: "<<buffer[0]<<endl;
+                if(observador){
+                    cout<<"Turno de "<<buffer[0]<<endl;
+                }
+                else if(MySymbol == ' '){
+                    MySymbol = buffer[0];
+                    cout<<"Partida creada. Tu ficha es: "<<buffer[0]<<endl;
+                }
+                else if(MySymbol == buffer[0]){
+                    cout<<"Es tu turno ("<<MySymbol<<")"<<endl;
+                }
+                else{
+                    cout<<"Turno del rival(" <<buffer[0]<<")"<<endl;
+                }
+                cout << "> " << flush;
             } else if(s == 'T'){
                 n = read(IdSocket,buffer,9);
                 buffer[n] = '\0';
-                cout << " " << buffer[0] << " | " << buffer[1] << " | " << buffer[2] << "   (0, 1, 2)\n";
+                cout << endl;
+                cout << " " << buffer[0] << " | " << buffer[1] << " | " << buffer[2] << "   (1, 2, 3)\n";
                 cout << "-----------\n";
-                cout << " " << buffer[3] << " | " << buffer[4] << " | " << buffer[5] << "   (3, 4, 5)\n";
+                cout << " " << buffer[3] << " | " << buffer[4] << " | " << buffer[5] << "   (4, 5, 6)\n";
                 cout << "-----------\n";
-                cout << " " << buffer[6] << " | " << buffer[7] << " | " << buffer[8] << "   (6, 7, 8)\n\n";
-
+                cout << " " << buffer[6] << " | " << buffer[7] << " | " << buffer[8] << "   (7, 8, 9)\n\n";
+                cout << "> " << flush;
             } else if(s=='W'){
+                MySymbol = ' '; 
                 cout<<"Ganaste la partida!!"<<endl;
+                cout << "> " << flush;
             } else if(s=='O'){
+                MySymbol = ' ';
                 cout<<"Perdiste la partida.."<<endl;
+                cout << "> " << flush;
             }
         }
     }
@@ -152,13 +176,11 @@ int main(int argc, char *argv[]){
     }
     
 
-    //stSockAddr = 000000000000000000...
     memset(&stSockAddr, 0, sizeof(struct sockaddr_in));
 
     stSockAddr.sin_family = AF_INET;
     stSockAddr.sin_port = htons(atoi(argv[2]));
 
-    //int inet_pton(int af, const char *src, void *dst);
     Res = inet_pton(AF_INET, argv[1], &stSockAddr.sin_addr);
 
     if(Res == 0){
@@ -186,7 +208,7 @@ int main(int argc, char *argv[]){
 
     thread(ThreadReadServer,SocketFD).detach();
     
-    cout<<"[B]: Broadcast, [M]: Private Message, [F]: File, [Q]: Quit, [L] List of Clients,[T] Tic-Tac-Toe\n";
+    cout<<"[B]: Broadcast, [M]: Private Message, [F]: File, [Q]: Quit, [L] List of Clients, \nTic-Tac-Toe\n[P] Play, [V] Spectator, [1-9] Movimiento\n";
     string option;
     for(;;){
         cout<<"> ";
@@ -238,25 +260,19 @@ int main(int argc, char *argv[]){
                 + zeroPad(file.size(),25) + file;
             write(SocketFD, data.c_str(), data.size());
         }
-        else if(option == "T" || option == "t"){
-            cout << "\n[1] Jugar  [2] Observar  [3] Mover\n> ";
-            string op;
-            getline(cin, op);
-            
-            if(op == "1"){
-                write(SocketFD,"TP",2);
-            }
-            else if(op == "2"){
-                write(SocketFD,"TV",2);
-            }
-            else if(op == "3"){
-                cout<<"Posicion (1-9): ";
-                string pos;
-                getline(cin, pos);
-                data = "TM" + pos.substr(0,1);
-                write(SocketFD,data.c_str(),data.size());
-            }
-            else cout<<"Invalid option"<<endl;
+        else if(option == "P" || option == "p"){
+            observador = 0;
+            write(SocketFD,"TP",2);
+            cout<<"Uniendose a una partida.."<<endl;
+        }
+        else if(option == "V" || option == "v"){
+            observador = 1;
+            write(SocketFD,"TV",2);
+            cout<<"Entrando como observador.."<<endl;
+        }
+        else if(option.size() == 1 && option[0] >= '1' && option[0] <= '9'){
+            data = "TM" + option.substr(0,1);
+            write(SocketFD,data.c_str(),data.size());
         }
         else cout<<"Invalid option"<<endl;
         

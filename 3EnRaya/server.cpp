@@ -19,6 +19,7 @@ using namespace std;
 
 map<string,int> ListOfCli;
 mutex map_mutex;
+mutex ttt_mutex;
 Game* game = 0;
 int clientWaiting = -1;
 string clientWaitingNick = "";
@@ -27,6 +28,30 @@ string zeroPad(int number, int size){
     string str = to_string(number);
     if(str.length() >= (size_t)size) return str;
     return string(size - str.length(), '0')+str;
+}
+
+void avisarTurno(){
+    string d = "Tt";
+    d += game->current;
+    write(game->p1, d.c_str(), d.size());
+    write(game->p2, d.c_str(), d.size());
+    for(int s : game->spectators) write(s, d.c_str(), d.size());
+}
+
+void salirDePartida(int fd){
+    lock_guard<mutex> lock(ttt_mutex);
+    if(fd == clientWaiting){ clientWaiting = -1; clientWaitingNick = ""; }
+    if(game != 0){
+        if(fd == game->p1 || fd == game->p2){
+            int otro = (fd == game->p1) ? game->p2 : game->p1;
+            write(otro, "TW", 2);
+            delete game;
+            game = 0;
+        } else {
+            auto& v = game->spectators;
+            v.erase(remove(v.begin(), v.end(), fd), v.end());
+        }
+    }
 }
 
 void ThreadReadClient(int IdSocket){
@@ -59,6 +84,10 @@ void ThreadReadClient(int IdSocket){
     while(1){
         n = read(IdSocket,buffer,1);
         if(n <= 0){
+             {
+                lock_guard<mutex> lock(ttt_mutex);
+                if(IdSocket == clientWaiting){ clientWaiting = -1; clientWaitingNick = ""; }
+            }
             lock_guard<mutex> lock(map_mutex);
             ListOfCli.erase(nickname);
             close(IdSocket);
@@ -119,8 +148,27 @@ void ThreadReadClient(int IdSocket){
             {
                 lock_guard<mutex> lock(map_mutex);
                 for(auto& p: ListOfCli){
-                    if(!V.empty()) V+= ",";
-                    V += p.first;
+                    if(!V.empty()) V+= ", ";
+                    string estado = "Nada";
+                     if(game != 0 && p.second == game->p1){
+                        estado = "X";
+                    }
+                    else if(game != 0 && p.second == game->p2){
+                        estado = "O";
+                    }
+                    else if(clientWaiting == p.second){
+                        estado = "Esperando contrincante";
+                    }
+                    else if(game != 0){
+                        for(int sp : game->spectators){
+                            if(p.second == sp){
+                                estado = "V";
+                                break;
+                            }
+                        }
+                    }
+
+                    V += p.first + ":" + "[" + estado + "]";
                 }
             }
             data = "l" + zeroPad(V.size(), 17) + V;
@@ -180,24 +228,36 @@ void ThreadReadClient(int IdSocket){
             buffer[n] = '\0';
             char s = buffer[0];
 
+            lock_guard<mutex> lock(ttt_mutex);
+
             if(s == 'P') { // Play
-                if(clientWaiting == -1) {
+                if(game!= 0){
+                    msg = "Ya hay una partida en curso";
+                    data = "e" + zeroPad(msg.size(),11) + msg;
+                    write(IdSocket,data.c_str(),data.size());
+                }
+                else if(clientWaiting == -1) {
                     clientWaiting = IdSocket; 
                     clientWaitingNick = nickname;
                 
                 }
+                else if(clientWaiting == IdSocket){
+                    msg = "Ya estas esperando";
+                    data = "e" + zeroPad(msg.size(),11) + msg;
+                    write(IdSocket,data.c_str(),data.size());
+                }
                 else{
-
+                    //if(game != 0) delete game;
                     game = new Game(clientWaitingNick,nickname,clientWaiting,IdSocket);
-                    data = "TtX";  
-                    write(game->p1,data.c_str(),data.size());
-                    data = "TtO";
-                    write(game->p2,data.c_str(),data.size());
-
+               
+                    write(game->p1, "TtX", 3);
+                    write(game->p2, "TtO", 3);
                     data = "TT";
                     data.append(game->board,9);
                     write(game->p1,data.c_str(),data.size());
                     write(game->p2,data.c_str(),data.size());
+
+                    avisarTurno();
 
                     clientWaiting = -1;
                     clientWaitingNick = "";
@@ -210,7 +270,7 @@ void ThreadReadClient(int IdSocket){
                 buffer[n] = '\0';
                 int pos = (buffer[0] - '0') - 1;
 
-                if(game == 0 || !game->active || (IdSocket != game->p1 && IdSocket != game->p2)){
+                if(game == 0 || (IdSocket != game->p1 && IdSocket != game->p2)){
                     msg = "No estas en una partida";
                     data = "e" + zeroPad(msg.size(),11) + msg;
                     write(IdSocket,data.c_str(),data.size());
@@ -234,38 +294,52 @@ void ThreadReadClient(int IdSocket){
                         data.append(game->board, 9);
                         write(game->p1, data.c_str(), data.size());
                         write(game->p2, data.c_str(), data.size());
-                        for(int s : game->spectators) write(s, data.c_str(), data.size());
+                        for(int sp : game->spectators) write(sp, data.c_str(), data.size());
 
                         if(game->checkWin(symbol)){
                             int loserId = (IdSocket == game->p1) ? game->p2 : game->p1;
                             write(IdSocket,"TW",2);
                             write(loserId,"TO",2);
-                            // game active = false
-                        
+                            //game->active = false;
+                            delete game;
+                            game = 0;
                         } else{
-                            game->current = (game->current == 'X') ? 'O': 'X';
-                            int nextTurn = (game->current == 'X') ? game->p1 : game->p2;
-                            data = "Tt"; 
-                            data += game->current;
-                            write(nextTurn,data.c_str(),data.size());
+                            bool full = true;
+                            for(int i = 0; i < 9; i++) if(game->board[i] == ' ') full = false;
+                            if(full){
+                                write(game->p1, "TO",2);
+                                write(game->p2, "TO",2);
+                                delete game;
+                                game = 0;
+                            } else{
+                                game->current = (game->current == 'X') ? 'O': 'X';
+                                avisarTurno();
+                            }
                         }
                     }
                 }
 
             } else if(s == 'V'){
-                if(game != 0){
+                if(game == 0){
+                    msg = "No hay partida activa";
+                    data = "e" + zeroPad(msg.size(),11) + msg;
+                    write(IdSocket,data.c_str(),data.size());
+                } 
+                else if(IdSocket == game->p1 || IdSocket == game->p2){
+                    msg = "Ya eres jugador";
+                    data = "e" + zeroPad(msg.size(),11) + msg;
+                    write(IdSocket, data.c_str(), data.size());
+                }
+                else{
                     game->addSpectator(IdSocket);
                     data = "TT";
                     data.append(game->board,9);
-                    write(IdSocket,data.c_str(),data.size());
-                } else{
-                    msg = "No hay partida activa";
-                    data = "e" + zeroPad(msg.size(),11) + msg;
                     write(IdSocket,data.c_str(),data.size());
                 }
             }
         }
         else if(action == 'Q'){
+            salirDePartida(IdSocket);
             lock_guard<mutex> lock(map_mutex);
             ListOfCli.erase(nickname);
             close(IdSocket);
