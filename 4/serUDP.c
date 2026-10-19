@@ -9,12 +9,17 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <string>
 #include <map>
 
 using namespace std;
 
-map<string, structure_cli> list;
+struct structure_cli{
+    string ip;
+    string port;
+};
 
+map<string, structure_cli> list;
 
 int main()
 {
@@ -52,8 +57,11 @@ int main()
         bytes_read = recvfrom(sock,recv_data,1024,0,
                     (struct sockaddr *)&client_addr, &addr_len);
     
-
-        recv_data[bytes_read] = '\0';
+        if(bytes_read > 0){
+            recv_data[bytes_read] = '\0';
+            recv_data[strcspn(recv_data, "\n")] = '\0';
+        }
+        //string nickname(recv_data,5);
 
         printf("\n(%s , %d) said : ",inet_ntoa(client_addr.sin_addr),
                                     ntohs(client_addr.sin_port));
